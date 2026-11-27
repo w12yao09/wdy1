@@ -17,6 +17,12 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 加载保存的充电自动录制开关状态
+        binding.cbAutoCharge.isChecked = AppPref.getAutoRecOnCharge(this)
+        binding.cbAutoCharge.setOnCheckedChangeListener { _, isChecked ->
+            AppPref.setAutoRecOnCharge(this, isChecked)
+        }
+
         // 申请全部文件权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -51,8 +57,8 @@ class MainActivity : AppCompatActivity() {
             stopService(Intent(this, RecorderService::class.java))
         }
         binding.btnLockCurrent.setOnClickListener {
-            RecorderService.targetFolder?.let {
-                // 锁定逻辑，你可以扩展
+            RecorderService.currentVideoFile?.let { f ->
+                File(f.absolutePath + ".lock").createNewFile()
             }
         }
     }
