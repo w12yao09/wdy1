@@ -1,25 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        app:layout_constraintTop_toTopOf="parent"/>
 
     <EditText
         android:id="@+id/et_folder_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="输入文件夹名称，例如 CarRecordMate50"/>
+        android:hint="输入文件夹名称，例如 CarRecordMate50"
+        app:layout_constraintTop_toBottomOf="@id/previewView"/>
 
     <EditText
         android:id="@+id/et_max_gb"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="最大容量(GB)，例如20"/>
+        android:hint="最大容量(GB)，例如20"
+        app:layout_constraintTop_toBottomOf="@id/et_folder_name"/>
 
     <RadioGroup
         android:id="@+id/rg_duration"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/et_max_gb">
         <RadioButton android:id="@+id/r1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1分钟"/>
         <RadioButton android:id="@+id/r2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="2分钟"/>
         <RadioButton android:id="@+id/r3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3分钟"/>
@@ -29,22 +39,26 @@
         android:id="@+id/cb_auto_charge"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="充电自动录制"/>
+        android:text="充电自动录制"
+        app:layout_constraintTop_toBottomOf="@id/rg_duration"/>
 
     <Button
         android:id="@+id/btn_start"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="开始录制"/>
+        android:text="开始录制"
+        app:layout_constraintTop_toBottomOf="@id/cb_auto_charge"/>
     <Button
         android:id="@+id/btn_stop"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="停止录制"/>
+        android:text="停止录制"
+        app:layout_constraintTop_toBottomOf="@id/btn_start"/>
     <Button
         android:id="@+id/btn_lock_current"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="手动锁定当前视频"/>
+        android:text="手动锁定当前视频"
+        app:layout_constraintTop_toBottomOf="@id/btn_stop"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
