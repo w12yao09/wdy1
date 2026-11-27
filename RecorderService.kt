@@ -36,7 +36,6 @@ class RecorderService : Service() {
         var isRecording = false
         var currentVideoFile: File? = null
     }
-
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: androidx.camera.video.Recording? = null
     private lateinit var batteryMonitor: BatteryMonitor
@@ -94,7 +93,6 @@ class RecorderService : Service() {
         }
         return START_STICKY
     }
-
     private fun startRecord() {
         isRecording = true
         val recorder = Recorder.Builder()
