@@ -25,6 +25,12 @@
         <RadioButton android:id="@+id/r3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3分钟"/>
     </RadioGroup>
 
+    <CheckBox
+        android:id="@+id/cb_auto_charge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="充电自动录制"/>
+
     <Button
         android:id="@+id/btn_start"
         android:layout_width="match_parent"
