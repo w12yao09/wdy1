@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/et_folder_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="输入文件夹名称，例如 CarRecordMate50"/>
+
+    <EditText
+        android:id="@+id/et_max_gb"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="最大容量(GB)，例如20"/>
+
+    <RadioGroup
+        android:id="@+id/rg_duration"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <RadioButton android:id="@+id/r1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1分钟"/>
+        <RadioButton android:id="@+id/r2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="2分钟"/>
+        <RadioButton android:id="@+id/r3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3分钟"/>
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/btn_start"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="开始录制"/>
+    <Button
+        android:id="@+id/btn_stop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="停止录制"/>
+    <Button
+        android:id="@+id/btn_lock_current"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="手动锁定当前视频"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
