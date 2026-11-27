@@ -1,29 +1,38 @@
 package com.example.carrecorder
 
+import android.app.PictureInPictureParams
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Rational
 import android.provider.Settings
+import android.util.Rational
 import android.widget.RadioGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.util.Consumer
 import com.example.carrecorder.databinding.ActivityMainBinding
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var preview: Preview? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 加载保存的充电自动录制开关状态
         binding.cbAutoCharge.isChecked = AppPref.getAutoRecOnCharge(this)
         binding.cbAutoCharge.setOnCheckedChangeListener { _, isChecked ->
             AppPref.setAutoRecOnCharge(this, isChecked)
         }
 
-        // 申请全部文件权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
@@ -52,14 +61,46 @@ class MainActivity : AppCompatActivity() {
             RecorderService.maxSizeBytes = maxGb * 1024 * 1024 * 1024
             val srv = Intent(this, RecorderService::class.java)
             startService(srv)
+            startCameraPreview()
         }
         binding.btnStop.setOnClickListener {
             stopService(Intent(this, RecorderService::class.java))
+            cameraProvider?.unbindAll()
         }
         binding.btnLockCurrent.setOnClickListener {
             RecorderService.currentVideoFile?.let { f ->
                 File(f.absolutePath + ".lock").createNewFile()
             }
+        }
+    }
+
+    private fun startCameraPreview() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            cameraProvider = cameraProviderFuture.get()
+            preview = Preview.Builder()
+                .build()
+                .also {
+                    it.setSurfaceProvider(binding.previewView.surfaceProvider)
+                }
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            try {
+                cameraProvider?.unbindAll()
+                cameraProvider?.bindToLifecycle(this, cameraSelector, preview)
+            } catch(exc: Exception) {
+                exc.printStackTrace()
+            }
+        }, android.os.HandlerExecutor(mainLooper))
+    }
+
+    // 按下Home，进入画中画
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (!RecorderService.isRecording) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val pipBuilder = PictureInPictureParams.Builder()
+            pipBuilder.setAspectRatio(Rational(16,9))
+            enterPictureInPictureMode(pipBuilder.build())
         }
     }
 }
