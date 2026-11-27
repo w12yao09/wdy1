@@ -4,8 +4,11 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -31,13 +34,35 @@ class RecorderService : Service() {
         var maxSizeBytes: Long = 10L * 1024 * 1024 * 1024 // 默认10GB
         var segmentSecond = 60 // 默认1分钟，UI可改为60/120/180
         var isRecording = false
+        var currentVideoFile: File? = null
     }
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: androidx.camera.video.Recording? = null
     private lateinit var batteryMonitor: BatteryMonitor
     private lateinit var collisionSensor: CollisionSensor
-    private var currentVideoFile: File? = null
+
+    // 充电广播接收器
+    private val chargeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context?, intent: Intent?) {
+            ctx ?: return
+            if (!AppPref.getAutoRecOnCharge(ctx)) return
+            val action = intent?.action ?: return
+            when (action) {
+                Intent.ACTION_POWER_CONNECTED -> {
+                    if (batteryMonitor.canRecord() && !isRecording) {
+                        startRecord()
+                        collisionSensor.start()
+                    }
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    if (isRecording) {
+                        stopRecord()
+                    }
+                }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -50,6 +75,12 @@ class RecorderService : Service() {
         }
         createNotificationChannel()
         startForeground(1, buildNotification())
+        // 注册充电监听
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+        registerReceiver(chargeReceiver, filter)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -102,6 +133,7 @@ class RecorderService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(chargeReceiver)
         stopRecord()
     }
 
