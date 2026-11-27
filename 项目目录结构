@@ -1,0 +1,22 @@
+car_recorder/
+├── .github
+│   └── workflows
+│       └── build.yml
+├── app
+│   ├── build.gradle
+│   └── src
+│       └── main
+│           ├── AndroidManifest.xml
+│           ├── java/com/example/carrecorder
+│           │   ├── MainActivity.kt
+│           │   ├── RecorderService.kt
+│           │   ├── FileManagerHelper.kt
+│           │   ├── BatteryMonitor.kt
+│           │   ├── CollisionSensor.kt
+│           │   └── VideoItem.kt
+│           └── res
+│               ├── layout
+│               │   └── activity_main.xml
+│               └── values
+│                   └── strings.xml
+└── settings.gradle
