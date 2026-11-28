@@ -8,12 +8,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
@@ -31,23 +27,24 @@ class RecorderService : Service() {
     companion object {
         const val CHANNEL_ID = "CAR_RECORDER"
         var targetFolder: File? = null
-        var maxSizeBytes: Long = 10L * 1024 * 1024 * 1024 // 默认10GB
-        var segmentSecond = 60 // 默认1分钟，UI可改为60/120/180
+        var maxSizeBytes: Long = 10L * 1024 * 1024 * 1024
+        var segmentSecond = 60
         var isRecording = false
         var currentVideoFile: File? = null
     }
+
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: androidx.camera.video.Recording? = null
     private lateinit var batteryMonitor: BatteryMonitor
     private lateinit var collisionSensor: CollisionSensor
+    private lateinit var gpsSpeedHelper: GpsSpeedHelper
 
-    // 充电广播接收器
     private val chargeReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             ctx ?: return
-            if (!AppPref.getAutoRecOnCharge(ctx)) return
+            if (!AppPref.getAutoChargeRecord(ctx)) return
             val action = intent?.action ?: return
-            when (action) {
+            when(action) {
                 Intent.ACTION_POWER_CONNECTED -> {
                     if (batteryMonitor.canRecord() && !isRecording) {
                         startRecord()
@@ -55,9 +52,7 @@ class RecorderService : Service() {
                     }
                 }
                 Intent.ACTION_POWER_DISCONNECTED -> {
-                    if (isRecording) {
-                        stopRecord()
-                    }
+                    if (isRecording) stopRecord()
                 }
             }
         }
@@ -66,15 +61,20 @@ class RecorderService : Service() {
     override fun onCreate() {
         super.onCreate()
         batteryMonitor = BatteryMonitor(this)
+        gpsSpeedHelper = GpsSpeedHelper(this)
+        gpsSpeedHelper.start()
+
         collisionSensor = CollisionSensor(this) {
-            // 碰撞：生成lock文件锁定当前视频
             currentVideoFile?.let { f ->
-                File(f.absolutePath + ".lock").createNewFile()
+                val crashSpeed = "%.0f".format(gpsSpeedHelper.currentSpeedKmH)
+                val lockFile = File("${f.absolutePath}_crash${crashSpeed}.lock")
+                lockFile.createNewFile()
             }
         }
+
         createNotificationChannel()
         startForeground(1, buildNotification())
-        // 注册充电监听
+
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
@@ -93,26 +93,33 @@ class RecorderService : Service() {
         }
         return START_STICKY
     }
+
     private fun startRecord() {
         isRecording = true
+        RecorderService.isRecording = true
+
         val recorder = Recorder.Builder()
             .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.higherQualityOrLowerThan(Quality.HD)))
             .build()
-        videoCapture = VideoCapture.Builder(recorder).build()
-        val fmt = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-        val name = "car_${fmt.format(Date())}.mp4"
+        videoCapture = VideoCapture.withOutput(recorder)
+
+        val fmt = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.getDefault())
+        val speedStr = "%.0f".format(gpsSpeedHelper.currentSpeedKmH)
+        val fileName = "car_${fmt.format(Date())}_spd${speedStr}.mp4"
         targetFolder ?: return
-        currentVideoFile = File(targetFolder, name)
-        val output = MediaStoreOutputOptions.Builder(contentResolver, MediaStoreOutputOptions.FILE_CONTENT_URI)
-            .setDestinationOptions(androidx.camera.video.FileOutputOptions.Builder(currentVideoFile!!).build())
-            .build()
-        recording = videoCapture!!.output.prepareRecording(this, output)
-            .withAudioEnabled(true)
+        currentVideoFile = File(targetFolder, fileName)
+
+        val outputOpt = MediaStoreOutputOptions.Builder(
+            contentResolver,
+            androidx.camera.video.FileOutputOptions.Builder(currentVideoFile!!).build()
+        ).build()
+
+        recording = videoCapture!!.output
+            .prepareRecording(this, outputOpt)
+            .withAudioEnabled()
             .start { event ->
                 if (event is VideoRecordEvent.Finalize) {
-                    // 一段录完，执行容量清理
                     FileManagerHelper.doCleanup(targetFolder!!, maxSizeBytes)
-                    // 自动开启下一段
                     if (isRecording && batteryMonitor.canRecord()) {
                         startRecord()
                     } else {
@@ -132,52 +139,26 @@ class RecorderService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(chargeReceiver)
+        gpsSpeedHelper.stop()
         stopRecord()
     }
 
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("行车记录仪录制中")
-            .setContentText("后台录制，电量≥30%持续工作")
+            .setContentText("GPS车速采集中")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "记录仪", NotificationManager.IMPORTANCE_LOW)
+            val ch = NotificationChannel(CHANNEL_ID, "记录仪服务", NotificationManager.IMPORTANCE_LOW)
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.createNotificationChannel(channel)
+            nm.createNotificationChannel(ch)
         }
     }
-    override fun onBind(intent: Intent?): IBinder? = null
-}
 
-private fun startRecord() {
-    isRecording = true
-    // 新增
-    RecorderService.isRecording = true
-    val recorder = Recorder.Builder()
-        .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.higherQualityOrLowerThan(Quality.HD)))
-        .build()
-    videoCapture = VideoCapture.Builder(recorder).build()
-    val fmt = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-    val name = "car_${fmt.format(Date())}.mp4"
-    targetFolder ?: return
-    currentVideoFile = File(targetFolder, name)
-    val output = MediaStoreOutputOptions.Builder(contentResolver, MediaStoreOutputOptions.FILE_CONTENT_URI)
-        .setDestinationOptions(androidx.camera.video.FileOutputOptions.Builder(currentVideoFile!!).build())
-        .build()
-    recording = videoCapture!!.output.prepareRecording(this, output)
-        .withAudioEnabled(true)
-        .start { event ->
-            if (event is VideoRecordEvent.Finalize) {
-                FileManagerHelper.doCleanup(targetFolder!!, maxSizeBytes)
-                if (isRecording && batteryMonitor.canRecord()) {
-                    startRecord()
-                } else {
-                    stopRecord()
-                }
-            }
-        }
+    override fun onBind(intent: Intent?): IBinder? = null
 }
