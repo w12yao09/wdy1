@@ -1,38 +1,29 @@
 package com.example.carrecorder
 
 import java.io.File
-import java.nio.file.Files
-import java.util.*
+import java.util.Arrays
 
 object FileManagerHelper {
-    // 扫描目标文件夹，统计总大小，超上限删除最早未锁定视频
-    fun doCleanup(targetFolder: File, maxSizeBytes: Long) {
-        if (!targetFolder.exists()) return
-        val allMp4 = targetFolder.listFiles { f -> f.name.endsWith(".mp4") } ?: return
-        val videoList = allMp4.map { videoFile ->
-            val lockFile = File(videoFile.absolutePath + ".lock")
-            VideoItem(
-                file = videoFile,
-                lockFile = lockFile,
-                isLocked = lockFile.exists(),
-                createTime = videoFile.lastModified()
-            )
-        }
-        var totalSize = videoList.sumOf { it.file.length() }
-        // 只清理未锁定的，按时间升序（最早的先删）
-        val toDelete = videoList.filter { !it.isLocked }.sortedBy { it.createTime }
-        for (item in toDelete) {
-            if (totalSize <= maxSizeBytes) break
-            val delSize = item.file.length()
-            item.file.delete()
-            if(item.lockFile.exists()) item.lockFile.delete()
-            totalSize -= delSize
-        }
-    }
-
-    fun createFolder(parent: File, folderName: String): File {
-        val dir = File(parent, folderName)
+    fun createFolder(root: File, folderName: String): File {
+        val dir = File(root, folderName)
         if (!dir.exists()) dir.mkdirs()
         return dir
+    }
+
+    fun doCleanup(folder: File, maxTotalBytes: Long) {
+        val allFiles = folder.listFiles() ?: return
+        val videoList = allFiles.filter { it.name.endsWith(".mp4") }.sortedBy { it.lastModified() }
+        var totalSize = allFiles.sumOf { it.length() }
+
+        for (video in videoList) {
+            if (totalSize <= maxTotalBytes) break
+            val lockFile = File(video.absolutePath + ".lock")
+            val lockFile2 = File(video.absolutePath + "_crash")
+            if (lockFile.exists() || allFiles.any { it.name.startsWith(video.name) && it.name.contains("_crash") }) {
+                continue
+            }
+            totalSize -= video.length()
+            video.delete()
+        }
     }
 }
