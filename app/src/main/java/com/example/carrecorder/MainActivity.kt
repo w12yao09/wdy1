@@ -5,16 +5,12 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.os.Rational
-import android.provider.Settings
 import android.util.Rational
 import android.widget.RadioGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.core.util.Consumer
 import com.example.carrecorder.databinding.ActivityMainBinding
 import java.io.File
 
@@ -28,17 +24,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.cbAutoCharge.isChecked = AppPref.getAutoRecOnCharge(this)
+        binding.cbAutoCharge.isChecked = AppPref.getAutoChargeRecord(this)
         binding.cbAutoCharge.setOnCheckedChangeListener { _, isChecked ->
-            AppPref.setAutoRecOnCharge(this, isChecked)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = android.net.Uri.parse("package:$packageName")
-                startActivity(intent)
-            }
+            AppPref.setAutoChargeRecord(this, isChecked)
         }
 
         binding.rgDuration.setOnCheckedChangeListener { _, id ->
@@ -55,52 +43,52 @@ class MainActivity : AppCompatActivity() {
             val maxGbText = binding.etMaxGb.text.toString().trim()
             if (folderName.isEmpty() || maxGbText.isEmpty()) return@setOnClickListener
             val maxGb = maxGbText.toLongOrNull() ?: return@setOnClickListener
-            val rootDir = Environment.getExternalStorageDirectory()
-            val targetDir = FileManagerHelper.createFolder(rootDir, folderName)
+            val targetDir = FileManagerHelper.createFolder(Environment.getExternalStorageDirectory(), folderName)
             RecorderService.targetFolder = targetDir
             RecorderService.maxSizeBytes = maxGb * 1024 * 1024 * 1024
-            val srv = Intent(this, RecorderService::class.java)
-            startService(srv)
+            val intent = Intent(this, RecorderService::class.java)
+            startService(intent)
             startCameraPreview()
         }
+
         binding.btnStop.setOnClickListener {
             stopService(Intent(this, RecorderService::class.java))
             cameraProvider?.unbindAll()
         }
+
         binding.btnLockCurrent.setOnClickListener {
             RecorderService.currentVideoFile?.let { f ->
-                File(f.absolutePath + ".lock").createNewFile()
+                val crashSpeed = "%.0f".format(GpsSpeedHelper(this).currentSpeedKmH)
+                File("${f.absolutePath}_crash${crashSpeed}.lock").createNewFile()
             }
         }
     }
 
     private fun startCameraPreview() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener({
-            cameraProvider = cameraProviderFuture.get()
-            preview = Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(binding.previewView.surfaceProvider)
-                }
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+        val future = ProcessCameraProvider.getInstance(this)
+        future.addListener({
+            cameraProvider = future.get()
+            preview = Preview.Builder().build().apply {
+                setSurfaceProvider(binding.previewView.surfaceProvider)
+            }
+            val selector = CameraSelector.DEFAULT_BACK_CAMERA
             try {
                 cameraProvider?.unbindAll()
-                cameraProvider?.bindToLifecycle(this, cameraSelector, preview)
-            } catch(exc: Exception) {
-                exc.printStackTrace()
+                cameraProvider?.bindToLifecycle(this, selector, preview)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        }, android.os.HandlerExecutor(mainLooper))
+        }, mainExecutor)
     }
 
-    // 按下Home，进入画中画
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (!RecorderService.isRecording) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val pipBuilder = PictureInPictureParams.Builder()
-            pipBuilder.setAspectRatio(Rational(16,9))
-            enterPictureInPictureMode(pipBuilder.build())
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16,9))
+                .build()
+            enterPictureInPictureMode(params)
         }
     }
 }
