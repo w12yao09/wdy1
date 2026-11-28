@@ -4,18 +4,16 @@ import android.content.Context
 import android.content.SharedPreferences
 
 object AppPref {
-    private const val NAME = "car_recorder_pref"
-    private const val KEY_AUTO_REC_ON_CHARGE = "auto_rec_on_charge"
+    private const val PREF_NAME = "car_recorder_pref"
+    private const val KEY_AUTO_CHARGE = "auto_charge_record"
 
-    private fun getPref(ctx: Context): SharedPreferences {
-        return ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    fun getAutoChargeRecord(ctx: Context): Boolean {
+        val sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return sp.getBoolean(KEY_AUTO_CHARGE, false)
     }
 
-    fun setAutoRecOnCharge(ctx: Context, enable: Boolean) {
-        getPref(ctx).edit().putBoolean(KEY_AUTO_REC_ON_CHARGE, enable).apply()
-    }
-
-    fun getAutoRecOnCharge(ctx: Context): Boolean {
-        return getPref(ctx).getBoolean(KEY_AUTO_REC_ON_CHARGE, false)
+    fun setAutoChargeRecord(ctx: Context, enable: Boolean) {
+        val sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        sp.edit().putBoolean(KEY_AUTO_CHARGE, enable).apply()
     }
 }
